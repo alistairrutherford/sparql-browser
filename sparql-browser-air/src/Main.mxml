@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+ * Copyright 2011 -  Alistair Rutherford - www.netthreads.co.uk, Feb 2011
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ *
+-->
+
+<mx:WindowedApplication xmlns:mx="http://www.adobe.com/2006/mxml" layout="absolute"
+						xmlns:business="com.nethreads.viewer.search.business.*" 
+						xmlns:control="com.nethreads.viewer.search.control.*" 
+						xmlns:vc="com.nethreads.viewer.search.view.controller.*" 
+						xmlns:graph="com.nethreads.viewer.search.view.graphView.*" 
+						xmlns:result="com.nethreads.viewer.search.view.resultView.*" 
+						xmlns:query="com.nethreads.viewer.search.view.queryView.*" 
+						xmlns:local="*"
+                        width="1189"
+                        height="830"
+                        showFlexChrome="false"
+						creationComplete="init()">
+
+	<mx:Style>
+		@namespace "library://ns.adobe.com/flex/mx";
+		@namespace s "library://ns.adobe.com/flex/spark";
+	</mx:Style>
+
+    <mx:Style source="../assets/css/styles.css"/>
+
+	<mx:Script>
+		<![CDATA[
+        import com.nethreads.viewer.search.events.data.QueryConfigEvent;
+
+        import mx.core.IDataRenderer;
+        import mx.controls.Alert;
+
+        import com.nethreads.viewer.search.view.aboutView.AboutView;
+        import com.nethreads.viewer.search.events.QueryEvent;
+        import com.nethreads.viewer.search.vo.ResultVO;
+        import com.nethreads.viewer.search.events.NodeSelectEvent;
+        import com.nethreads.viewer.search.model.ResultModelLocator;
+        import com.nethreads.viewer.search.events.ViewEvent;
+
+        /**
+         * Initialise application.
+         *
+         */
+        private function init():void {
+            // Pull in queries from configuration data.
+            var configQueryEvent:QueryConfigEvent = new QueryConfigEvent();
+            configQueryEvent.dispatch();
+        }
+
+        /**
+         * Open About view.
+         *
+         */
+        private function onAbout(event:Event):void {
+            var about:AboutView = new AboutView();
+
+            about.open(this, onAboutClose);
+        }
+
+        /**
+         * Called when about is closed.
+         *
+         */
+        private function onAboutClose():void {
+        }
+
+        /**
+         * Show alert on top view making suer we hide the map if required.
+         *
+         */
+        public function showAlert(ev:Event):void {
+            var eventAlert:ViewEvent = ViewEvent(ev);
+            Alert.show(eventAlert.message, null, Alert.OK, null);
+        }
+
+
+        /**
+         * Triggered when graph item is selected.
+         *
+         * @param ev The selection event.
+         */
+        private function onGraphSelect(ev:Event):void {
+            var nodeEv:NodeSelectEvent = NodeSelectEvent(ev);
+
+            var id:String = nodeEv.id;
+            var url:String = nodeEv.url;
+
+            // Look for cluster
+            var target:ResultVO = ResultModelLocator.getInstance().getResult(id);
+
+            if (target != null) {
+                searchGraph.resultGrid.selected = target;
+            }
+
+            if (url != null && url != "") {
+                browsePage.location = url;
+                browsePage.reload();
+            }
+
+        }
+        ]]>
+	</mx:Script>
+	
+	<!-- the ServiceLocator where we specify the remote services -->
+	<business:Services id="services" />
+	
+	<!-- the FrontController, containing Commands specific to this appliation -->
+	<control:QueryController id="panelQuery" />
+	
+	<!-- handles switching between overview elements-->
+	<vc:OverViewController id="overViewController" 
+						   alertEvent="showAlert(event)"/>
+	
+	<mx:VDividedBox width="100%" height="100%" paddingLeft="5" paddingRight="5">
+		
+		<query:QueryView id="queryPage" width="100%" height="30%" about="onAbout(event)"/>
+
+		<mx:TabNavigator id="searchTabs" width="100%" height="100%" creationPolicy="all">
+			
+			<graph:SearchGraph id="searchGraph" width="100%" height="100%" 
+							   label="Graph"
+							   nodeSelectEvent="onGraphSelect(event)"/>
+			
+			<result:XMLView id="xmlView" width="100%" height="100%" 
+							label="XML"/>
+
+            <mx:Box label="Browser">
+                <mx:HTML id="browsePage" location="" width="100%" height="100%"/>
+            </mx:Box>
+
+		</mx:TabNavigator>
+		
+	</mx:VDividedBox>
+	
+</mx:WindowedApplication>

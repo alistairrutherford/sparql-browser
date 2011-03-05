@@ -1,0 +1,10 @@
+<component name="libraryTable">
+  <library name="sparql-viewer-air" type="flex">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/libs/RaVis.swc!/" />
+      <root url="jar://$PROJECT_DIR$/libs/Cairngorm.swc!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

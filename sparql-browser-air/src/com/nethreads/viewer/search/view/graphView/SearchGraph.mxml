@@ -1,0 +1,288 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+ * Copyright 2008 -  Alistair Rutherford - www.netthreads.co.uk, Jan 2008
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ * 
+-->
+
+<mx:Box xmlns:mx="http://www.adobe.com/2006/mxml" 
+	xmlns:fc="http://www.adobe.com/2006/fc"
+	xmlns:ravis="org.un.cava.birdeye.ravis.graphLayout.visual.*"
+	xmlns:lc="org.un.cava.birdeye.ravis.components.ui.controls.layouterControls.*"
+	xmlns:vc="org.un.cava.birdeye.ravis.components.ui.controls.vgraphControls.*"
+	xmlns:ui="org.un.cava.birdeye.ravis.components.ui.*"
+	xmlns:dp="org.un.cava.birdeye.ravis.components.ui.dataPresentation.*"
+   	xmlns:result="com.nethreads.viewer.search.view.resultView.*" 
+	xmlns:graphView="com.nethreads.viewer.search.view.graphView.*"
+	creationComplete="init()" >
+	
+	<mx:Metadata>
+    [Event(name="nodeSelectEvent", type="flash.events.Event")]
+	</mx:Metadata>
+	
+	<mx:Script>
+		<![CDATA[
+			import com.nethreads.viewer.search.control.LinkLength;
+			import com.nethreads.viewer.search.renderers.EdgeLabelRenderer;
+			import mx.events.FlexEvent;
+			import mx.containers.Canvas;
+			import flash.utils.unescapeMultiByte;
+			import mx.core.UIComponent;
+			import mx.core.IDataRenderer;
+			import mx.events.PropertyChangeEvent;
+			import mx.collections.ArrayCollection;
+
+			import org.un.cava.birdeye.ravis.graphLayout.data.INode;
+			import org.un.cava.birdeye.ravis.graphLayout.visual.IVisualNode;
+			import org.un.cava.birdeye.ravis.graphLayout.data.IGraph;
+			import org.un.cava.birdeye.ravis.graphLayout.data.Graph;
+			import org.un.cava.birdeye.ravis.graphLayout.layout.ConcentricRadialLayouter;
+			import org.un.cava.birdeye.ravis.graphLayout.visual.edgeRenderers.DirectedArrowEdgeRenderer;
+			import org.un.cava.birdeye.ravis.components.renderers.edgeLabels.DefaultEdgeLabelRenderer;
+			import org.un.cava.birdeye.ravis.components.renderers.nodes.BaseNodeRenderer;
+			import org.un.cava.birdeye.ravis.components.ui.controls.vgraphControls.NodeRendererSelector;
+			import org.un.cava.birdeye.ravis.components.ui.controls.vgraphControls.EdgeRendererSelector;
+			import org.un.cava.birdeye.ravis.components.ui.controls.vgraphControls.DegreesOfSeparation;
+			import org.un.cava.birdeye.ravis.assets.icons.EmbeddedIcons;
+
+			import com.nethreads.viewer.search.vo.ResultVO;
+			import com.nethreads.viewer.search.renderers.CircleNodeRenderer;
+			import com.nethreads.viewer.search.model.ResultModelLocator;
+			import com.nethreads.viewer.search.events.NodeSelectEvent;
+			import com.nethreads.viewer.search.renderers.RenderProperties;
+
+			private var EMPTY_GRAPH:XML = <Graph><Node id='vizgraph' name='Empty' nodeClass='earth' nodeIcon='center' description='Empty'/></Graph>
+
+			private var graph:IGraph = null;
+			
+			// This variable is used to supress the resize handler until the
+			// graph has finished initialising. Otherwise it can occasionally go
+			// into a tailspin.
+			private var initDone:Boolean = false;
+
+			public var selectedNodeID:String = "";
+
+ 			/**
+ 			 * Initialise
+ 			 *
+ 			 */
+			private function init():void
+			{
+				ResultModelLocator.getInstance().addEventListener(PropertyChangeEvent.PROPERTY_CHANGE, onGmlChange, false, 0, true);
+				
+				RenderProperties.getInstance().registerClickHandler(singleClick);
+				
+				// Create an empty graph otherwise the vizgraph core code throws and error if you click
+				// on the graph area. I can't be bothered trying to fix this in the core graph code.
+				update(EMPTY_GRAPH);
+			}
+
+ 			/**
+ 			 * Triggered when gml changed.
+ 			 *
+ 			 */
+			private function onGmlChange(event:PropertyChangeEvent):void
+			{
+				if (event.property=="gml")
+				{
+					var xmlData:XML = XML(event.newValue);
+
+					update(xmlData);				
+				}
+			}
+			
+ 			/**
+ 			 * Setup gml and build graph.
+ 			 *
+ 			 */
+			private function update(xmlData:XML):void
+			{
+				initDone = false;
+				
+				/* init a graph object with the XML data */
+				graph = new Graph("XMLAsDocsGraph",false,xmlData);
+				
+				// select a root node, most layouters requires a root node
+				var root:String = ResultModelLocator.getInstance().startNode;
+				
+				// Set the graph in the VGraph object, this automatically
+				// initializes the VGraph items
+				vgraph.graph = graph;
+
+				// assign start root
+				vgraph.currentRootVNode = vgraph.graph.nodeByStringId(root).vnode;
+
+				// Layout
+				vgraph.layouter = new ConcentricRadialLayouter(vgraph);
+
+				// Node renderer
+				vgraph.itemRenderer = new ClassFactory(CircleNodeRenderer);
+
+				// Edge Renderer
+				vgraph.edgeRenderer = new DirectedArrowEdgeRenderer(vgraph.edgeDrawGraphics);
+
+				// Edge label renderer
+				vgraph.edgeLabelRenderer = new ClassFactory(EdgeLabelRenderer);
+
+				vgraph.maxVisibleDistance = 1;
+				
+				vgraph.layouter.linkLength = LinkLength.DEFAULT_LINK_LENGTH
+				
+				initDone = true;
+				
+				/* the following kicks it off .... */
+				vgraph.draw();
+				
+				resultGrid.update(ResultModelLocator.getInstance().results);
+			}
+
+			/**
+			* Triggered when grid item is selected.
+			*
+			* @param The selection event.
+			*/
+			private function onGridSelect(event:Event):void
+			{
+				var result:ResultVO = ResultVO(resultGrid.selected);
+				
+				var id:String = result.id;
+				
+				// Centre on selected node.
+				centerNode(id);
+				
+				// Reselect clicked item as the list may have been updated.
+				resultGrid.selected = result;
+				
+				vgraph.draw();
+			}
+
+			/**
+			* Handler for single click. This is registered with the renderer properties
+			* object to route single clicks to here.
+			*
+			* @param The click event.
+			*/
+			public function singleClick(event:Event): void 
+			{
+				var ir:IDataRenderer;
+				
+				if(event.currentTarget is IDataRenderer) 
+				{
+					ir = (event.currentTarget as IDataRenderer);
+					
+					var obj:Object =  ir.data.data;
+					
+					selectedNodeID = ir.data.data.@id;
+					
+					var url:String = ir.data.data.@url;
+					
+					var ev:NodeSelectEvent = new NodeSelectEvent(selectedNodeID, url);
+					
+					// Dispatch event which can be handled by whatever uses the graph.					
+	                this.dispatchEvent(ev);
+				} 
+				else 
+				{
+					trace("single click event target is no IDataRenderer");
+				}
+			}
+
+			/**
+			 * This function takes the node and selects it as a root
+			 * node, automatically centering the layout around it.
+			 *
+			 */
+			public function centerNode(nodeID:String):void {
+				/* we assume we have the vgraph and graph objects */
+				
+				var newroot:INode;
+				
+				newroot = graph.nodeByStringId(nodeID);
+				
+				/* if we have a node, set its vnode as the new root */
+				if(newroot) 
+				{
+					
+					/* is it really a new node */
+					if(newroot.vnode != vgraph.currentRootVNode) 
+					{
+						/* set it in the vgraph */
+						vgraph.currentRootVNode = newroot.vnode;
+					}
+					
+				} 
+				else 
+				{
+					trace("Node with id:"+nodeID+" not found!!");
+				}
+				
+				// Track the selection.
+				selectedNodeID = nodeID;
+			}
+			
+ 			/**
+ 			 * Handle a resize event, but only do anything if the init was
+ 			 * done.
+ 			 *
+ 			 */
+ 			private function handleResize():void 
+ 			{
+ 				if(initDone) 
+ 				{
+ 					vgraph.draw(VisualGraph.DF_RESET_LL);
+ 				}
+ 			}			
+
+		]]>
+	</mx:Script>
+
+	<mx:HDividedBox width="100%" height="100%">
+		
+		<result:ResultView id="resultGrid" width="25%" height="100%" select="onGridSelect(event)"/>
+		
+		<mx:VBox width="75%" height="100%">
+
+			<ravis:VisualGraph id="vgraph" width="100%" height="100%" 
+				resize="handleResize()"
+				itemRenderer="org.un.cava.birdeye.ravis.components.renderers.nodes.SimpleCircleNodeRenderer"
+				visibilityLimitActive="true">
+				
+				<ravis:removeItemEffect>
+					<mx:Fade alphaFrom="1" alphaTo="0" duration="1000"/>				
+				</ravis:removeItemEffect>
+							
+				<ravis:addItemEffect>
+					<mx:Fade alphaFrom="0" alphaTo="1" duration="1000"/>
+				</ravis:addItemEffect>
+			</ravis:VisualGraph>
+	
+			<!-- Note we use events as transport for control values, this is so we can
+			     seperate the control panel from the graph if we want to. -->
+
+			<graphView:GraphControl id="control" 
+				width="100%"
+				vgraph="{vgraph}"/>
+				
+		</mx:VBox>
+		
+	</mx:HDividedBox>
+		
+</mx:Box>

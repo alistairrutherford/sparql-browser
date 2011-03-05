@@ -1,0 +1,333 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+ * Copyright 2008 -  Alistair Rutherford - www.netthreads.co.uk, Jan 2008
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ * 
+-->
+
+<mx:Panel xmlns:mx="http://www.adobe.com/2006/mxml"
+		verticalScrollPolicy="off"
+		xmlns:local="*"
+		headerHeight="0"
+		creationComplete="init()">
+
+	<mx:Metadata>
+        [Event(name="select", type="flash.events.Event")]
+	</mx:Metadata>
+
+	<mx:Script>
+	<![CDATA[
+		import mx.collections.Sort;
+		import mx.collections.SortField;
+		import mx.events.DataGridEvent;
+		import com.nethreads.viewer.search.model.MapCollection;
+		import org.un.cava.birdeye.ravis.graphLayout.data.INode;
+		import com.nethreads.viewer.search.vo.BindingVO;
+		import com.nethreads.viewer.search.vo.URIVO;
+		import com.nethreads.viewer.search.vo.LiteralVO;
+		import mx.collections.ArrayCollection;
+		import mx.controls.dataGridClasses.DataGridColumn;
+
+		import com.nethreads.viewer.search.model.ResultModelLocator;
+		import com.nethreads.viewer.search.vo.ResultVO;
+		import mx.events.ListEvent;
+		import mx.events.FlexEvent;
+
+        private var _selected:ResultVO = null;
+        private var _columnMap:MapCollection = null;
+
+        [Bindable] private var dataSort:Sort;
+		private var sortAscending:SortField;
+		private var sortDescending:SortField;
+        
+		/**
+		 * Initialise view.
+		 * 
+		 */
+        private function init():void 
+        {
+        	// This will store created columns against the index of the binding
+        	// which it matches to.
+        	_columnMap = new MapCollection();
+        	
+        	// Create sort
+            dataSort = new Sort();
+            sortAscending = new SortField("description", true, false);
+            sortDescending = new SortField("description", true, true);
+            dataSort.fields=[sortAscending];
+        }
+        
+        /**
+        * Return currently selected item.
+        *
+        */
+        public function get selected():ResultVO
+        {
+            return _selected;
+        }
+        
+        /**
+        * Set selection and scroll to target item.
+        *
+        * @param value The object to select.
+        */
+        public function set selected(value:ResultVO):void
+        {
+			if (value!=null)
+			{
+		        _selected = value;
+		        
+		        var data:ArrayCollection = ArrayCollection(grid.dataProvider);
+		        
+				var targetIndex:Number = data.getItemIndex(value);
+				grid.scrollToIndex(targetIndex);
+				grid.selectedIndex = targetIndex;
+			}
+        	
+        }
+
+		/**
+		 * Update view with data.
+		 * 
+		 * @param The data list.
+		 */
+		public function update(items:ArrayCollection):void
+		{
+			// Clear columns
+			clearColumns();
+
+			// Find item with the most possible columns
+			var item:ResultVO = findBindingExtent(items);
+			
+			// Rebuild
+			buildColumns(item, items);
+			
+			// Assign data
+			grid.dataProvider = items;
+
+			// Assign sort object
+            items.sort = dataSort;
+            
+           // Refresh the collection to show the sort in the grid.
+           items.refresh();
+		}            		
+		
+        /**
+        * Handle clicking on item in grid
+        *
+        * @param event The click event.
+        */        
+		public function onItemClick(event:Event):void 
+		{
+			if (event.currentTarget.selectedItem!=null)
+			{	
+				_selected = ResultVO(event.currentTarget.selectedItem);
+                this.dispatchEvent(new Event("select"));
+			}
+		}
+        
+		/**
+		 * Extract label from data
+		 * 
+		 * @param The data object.
+		 * @param The grid column.
+		 */
+        private function bindingLabelFunction(item:Object, column:DataGridColumn):String
+        {
+        	// Use first element to extract bindings
+        	var vo:ResultVO = ResultVO(item);
+
+			var value:String = "";
+			
+			// Got to defensively check the data as we can get all sorts of results.
+			if (vo.bindings!=null && vo.bindings.length>0)
+			{
+				var index:Number = Number(_columnMap.getItem(column));
+
+				if (index<vo.labels.length)
+				{
+        			value = String(vo.labels.getItemAt(index));
+    			}
+            }
+            
+            return value;    
+        }
+
+        /**
+        * Title comparison function.
+        *
+        * @param obj1 Object first object for comparison.
+        * @param obj2 Object second object for comparison.
+        */
+		private function sortCompareFunction(obj1:Object, obj2:Object):int
+		{
+        	// Use first element to extract bindings
+			var itemA:ResultVO = ResultVO(obj1);
+			var itemB:ResultVO = ResultVO(obj2);
+
+    		var valueA:String = itemA.description;
+    		var valueB:String = itemB.description;
+    		
+			if(valueA>valueB)
+			{
+				return -1;
+			}
+			else if(valueA<valueB)
+			{
+				return 1;
+			}
+			else
+			{
+				return 0;
+			}
+		}
+		
+		/**
+		 * Remove all columns from grid.
+		 * 
+		 */		
+		private function clearColumns():void
+		{
+			if (grid.columns!=null)
+			{
+	            var cols:Array = grid.columns;
+	            var len:int = cols.length;
+	            while (len-->0)
+	            {
+	            	cols.pop();
+	            }
+	            
+	            grid.columns = cols;
+	            
+				// Clear column map
+				_columnMap.clear();
+   			}
+		}
+		
+		/**
+		 * Search for result with the most bindings.
+		 * 
+		 * @param The result set.
+		 */
+		private function findBindingExtent(items:ArrayCollection):ResultVO
+		{
+			var target:ResultVO = null;
+			var count:int = 0;
+			for each (var result:ResultVO in items)
+			{
+				if (result.bindings.length>count)
+				{
+					count = result.bindings.length;
+					target = result;
+				}
+			}
+			
+			return target; 	
+		}
+		
+		/**
+		 * Build columns based on query result bindings.
+		 * 
+		 * @param The query result items.
+		 */		
+		private function buildColumns(vo:ResultVO, items:ArrayCollection):void
+		{
+            if (items!=null && items.length>0)
+            {
+				// Got to defensively check the data as we can get all sorts of results.
+				if (vo.bindings!=null && vo.bindings.length>0)
+				{
+					var index:Number = 0;
+					for each (var binding:BindingVO in vo.bindings)
+					{
+	            		var column:DataGridColumn = addDataGridColumn(binding.name);
+						
+						// Store column object (used as key) against the index of the binding
+						// This is so the label function can determine which binding it
+						// maps to.
+	            		_columnMap.putItem(column, index++);
+	            		
+	            		column.labelFunction = bindingLabelFunction;
+	            		
+	            		column.sortCompareFunction = sortCompareFunction;
+	            	}
+	            }
+            }
+		}
+		
+		/**
+		 * Add column with supplied title to grid.
+		 * 
+		 * @param The column header title.
+		 */
+        private function addDataGridColumn(title:String):DataGridColumn 
+        {
+            var newColumn:DataGridColumn = new DataGridColumn(title);
+            var cols:Array = grid.columns;
+            
+            cols.push(newColumn);
+            
+            grid.columns = cols;
+            
+            return newColumn
+        }
+		
+		/**
+		 * Handle header column click.
+		 * 
+		 */
+        private function headRelEvt(event:DataGridEvent):void 
+        {
+        	if (dataSort.fields[0]==sortAscending)
+        	{
+        		dataSort.fields[0]=sortDescending
+        	}
+        	else
+        	{
+        		dataSort.fields[0] = sortAscending;
+        	}
+        	
+           // Apply the updated sort fields and re-sort.
+           grid.dataProvider.sort=dataSort;
+            
+           // Refresh the collection to show the sort in the grid.
+           grid.dataProvider.refresh();
+            
+           // Prevent the DataGrid from doing a default column sort.
+           event.preventDefault();
+        }		
+        
+	 ]]>
+	</mx:Script>
+
+	<mx:DataGrid id="grid"
+		height="100%" 
+		width="100%"
+		variableRowHeight="true"
+		wordWrap="true"
+		minHeight="0"
+	    itemClick="onItemClick(event)"
+	    headerRelease="headRelEvt(event)">
+
+	</mx:DataGrid>
+
+</mx:Panel>
+	
