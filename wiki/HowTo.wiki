@@ -1,5 +1,5 @@
 #labels Featured
-#How to configure endpoint and queries
+*How to configure endpoint and queries*
 
 = Introduction =
 
@@ -21,4 +21,3 @@ Future versions of the application will allow you to load the configuration dire
 </table>
 
   * Step 2 - Edit the queries.xml file
-
