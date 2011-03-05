@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+ * Copyright 2008 -  Alistair Rutherford - www.netthreads.co.uk, Jan 2008
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ * 
+-->
+
+<mx:Box xmlns:mx="http://www.adobe.com/2006/mxml"
+		xmlns:vc="com.nethreads.viewer.search.control.*">
+	
+	<mx:Script>
+		<![CDATA[
+			import org.un.cava.birdeye.ravis.graphLayout.visual.VisualGraph;
+
+			[Bindable] private var _vgraph:VisualGraph;
+
+			/**
+			 * Provides access to the registered vgraph object.
+			 * */
+			public function set vgraph(v:VisualGraph):void 
+			{
+				_vgraph = v;
+			}
+
+			/**
+			 * @private
+			 * */
+			public function get vgraph():VisualGraph 
+			{
+				return _vgraph;
+			}
+		]]>
+	</mx:Script>	
+	
+	<mx:Panel layout="horizontal" width="100%" height="60" headerHeight="5">
+		<vc:DegreesOfSeparation id="myDegreeOS" vgraph="{_vgraph}" />
+		<vc:ScaleLabels id="myScale" vgraph="{_vgraph}" />
+		<vc:LinkLength id="myLength" vgraph="{_vgraph}" />
+		<vc:ToggleAutoFit id="myAutoFit" vgraph="{_vgraph}" />
+		<!--
+		-->
+	</mx:Panel>
+	
+</mx:Box>

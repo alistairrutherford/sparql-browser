@@ -1,0 +1,354 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+ * Copyright 2008 -  Alistair Rutherford - www.netthreads.co.uk, Jan 2008
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ * 
+-->
+
+<mx:ApplicationControlBar xmlns:mx="http://www.adobe.com/2006/mxml" 
+	xmlns:fc="http://www.adobe.com/2006/fc"
+	paddingTop="2"
+	paddingBottom="2"	
+	creationComplete="init()">
+
+	<mx:Metadata>
+        [Event(name="executeQuery", type="com.nethreads.viewer.search.events.QueryEvent")]
+        [Event(name="about", type="flash.events.Event")]
+	</mx:Metadata>
+
+	<mx:Script>
+		<![CDATA[
+			import com.nethreads.viewer.search.vo.EndpointVO;
+			import com.nethreads.viewer.search.vo.QueryVO;
+			import mx.events.PropertyChangeEvent;
+			import mx.collections.ArrayCollection;
+			import flash.events.Event;
+			import mx.events.ValidationResultEvent;
+			
+			import com.nethreads.viewer.search.model.QueryModelLocator;
+			import com.nethreads.viewer.search.events.data.CancelGetResultsEvent;
+
+			import com.nethreads.viewer.search.events.AlertEvent;
+			import com.nethreads.viewer.search.events.QueryEvent;
+			import com.nethreads.viewer.search.model.MetaDataLocator;
+			
+			[Bindable] private var limitEnabled:Boolean = true;
+
+			[Bindable] private var metaData:MetaDataLocator = MetaDataLocator.getInstance();
+
+			[Bindable] private var limit:Number = 0;
+			[Bindable] private var endpoint:String = "";
+			
+			[Bindable] private var LIMIT_ERROR_MESSAGE:String = "";
+			[Bindable] private var URL_ERROR_MESSAGE:String = "";
+			
+			[Bindable] private var _queries:ArrayCollection = null;
+			[Bindable] private var _endpoints:ArrayCollection = null;
+			
+			private function init():void
+			{
+				limit = MetaDataLocator.DEFAULT_LIMIT;
+				endpoint = QueryModelLocator.DEFAULT_ENDPOINT;
+				
+				URL_ERROR_MESSAGE = MetaDataLocator.URL_ERROR_MESSAGE;
+				LIMIT_ERROR_MESSAGE = MetaDataLocator.LIMIT_ERROR_MESSAGE;
+				
+				// Set listener on the loading of endpoints and queries. When either of
+				// these is loaded it will get handled to populate the view.
+				var locator:QueryModelLocator = QueryModelLocator.getInstance();
+				locator.addEventListener(PropertyChangeEvent.PROPERTY_CHANGE, onDataChanged);	
+			}	
+
+			/**
+			 * Handle change to query information.
+			 * 
+			 * @param Property changed event.
+			 */
+			private function onDataChanged(event:PropertyChangeEvent):void
+			{
+				var locator:QueryModelLocator = QueryModelLocator.getInstance();
+				
+				if (event.property=="endpoints")
+				{
+					_endpoints = new ArrayCollection(locator.endpoints.source);
+					queryEndpoint.selectedIndex = 0;
+				}
+				else
+					if (event.property=="queries")
+					{
+						_queries = new ArrayCollection(locator.queries.source);
+				        if (_queries!=null)
+			            {
+							_queries.filterFunction = filterQuery;
+							_queries.refresh();
+							
+							queryPredefined.selectedIndex = 0;
+							
+							setQuery();
+						}
+					}
+				
+			}			
+			
+		    /**
+		    * Dispatch search request up to application via event.
+		    *
+		    */
+		    private function onClickGo(event:Event):void
+		    {
+		    	if (useQueryLimit.selected)
+		    	{
+		    		try
+		    		{
+		    			var limit:Number = parseInt(queryLimit.text);
+		    			var endP:String = queryEndpoint.text;
+		    			
+	                	this.dispatchEvent(new QueryEvent(limit, endP));
+		    		}
+		    		catch (e:Error)
+		    		{
+			            var alertEvent:AlertEvent = new AlertEvent("Error in query limit value!");
+			            alertEvent.dispatch();
+		    		}
+		    	}
+		    	else
+		    	{
+	            	this.dispatchEvent(new QueryEvent(-1, endpoint));
+		    	}
+		    }
+
+		    /**
+		    * Abort last search request.
+		    *
+		    */
+		    private function onClickCancel(event:Event):void
+		    {
+		    	var cancelEvent:CancelGetResultsEvent= new CancelGetResultsEvent();
+		    	
+		    	cancelEvent.dispatch();
+		    }
+
+		    /**
+		    * Handle checkbox selection.
+		    *
+		    */
+			private function onClickCheck(event:Event):void
+			{
+				limitEnabled = useQueryLimit.selected;
+			}
+
+		    /**
+		    * Dispatch search request up to application via event.
+		    *
+		    */
+		    private function onAbout(event:Event):void
+		    {
+		    	var ev:Event = new Event("about");
+		    	this.dispatchEvent(ev);
+		    }
+		   
+		    /**
+		    * Handle endpoint change by refiltering the query list.
+		    * 
+		    * @param change event. 
+		    */
+			private function onEndpointChange(event:Event):void
+			{
+				_queries.filterFunction = filterQuery;
+				_queries.refresh();
+				queryPredefined.selectedIndex = 0;
+				
+				setQuery();
+			}
+
+		    /**
+		    * Handle query change. Note we update the model the view will change.
+		    * 
+		    * @param change event. 
+		    */
+			private function onQueryChange(event:Event):void
+			{
+				if (queryPredefined.selectedItem!=null)
+				{
+					setQuery();
+				}
+			}
+
+			/**
+			 * Assign query elements from model.
+			 * 
+			 */
+			private function setQuery():void
+			{
+				var locator:QueryModelLocator = QueryModelLocator.getInstance();
+				
+				if (queryPredefined.selectedItem!=null)
+				{
+					if (_queries.length!=0)
+					{
+						var query:QueryVO = QueryVO(queryPredefined.selectedItem);
+						
+						locator.query = query.data;
+						locator.prefix = query.prefix;
+					}
+				} 
+			}
+			            
+	        /**
+	        * Filter query list according to endpoint.
+	        *
+	        * @param list item.
+	        */
+	        public function filterQuery(item:QueryVO):Boolean
+	        {
+	            var result:Boolean=false;
+	    
+	        	// Determine if query part of endpoint list.
+	        	trace(queryEndpoint);
+	        	
+	            if (queryEndpoint.selectedItem!=null && item.endpoint==queryEndpoint.selectedItem.id)
+	            {
+	                result = true;
+	            }
+	            else
+	            {
+	                result = false;
+	            }
+	                
+	            return result;
+	        }
+        	
+        	/**
+        	 * Return endpoint value to display in combobox.
+        	 * 
+        	 * @param Combobox item.
+        	 */
+        	private function endpointLabel(item:Object):String
+        	{
+        		var endpoint:EndpointVO = EndpointVO(item);
+        		
+        		return endpoint.value;
+        	}
+        	
+        	/**
+        	 * Return query title to display in combobox.
+        	 * 
+        	 * @param Combobox item.
+        	 */
+        	private function queryLabel(item:Object):String
+        	{
+        		var label:String = "None";
+        		
+				if (_queries.length!=0)
+				{
+	        		try
+	        		{
+	        			var query:QueryVO = QueryVO(item);
+	        			label = query.label;
+	        		}
+	        		catch (e:Error)
+	        		{
+						trace(item);        			
+	        		}
+    			}
+        		
+        		return label;
+        	}
+        	
+	    
+		]]>
+	</mx:Script>
+
+	<mx:NumberValidator id="limitValidator" 
+		domain="int" 
+		source="{queryLimit}" 
+		trigger="{queryLimit}"
+		triggerEvent="change"
+		integerError="{LIMIT_ERROR_MESSAGE}"
+		property="text"/>
+
+	<mx:Button id="queryButton" 
+		click="onClickGo(event)" 
+		right="10"
+	    upIcon="@Embed(source='../../../../../../../assets/image/control_play.png')"
+	    overIcon="@Embed(source='../../../../../../../assets/image/control_play.png')"
+	    downIcon="@Embed(source='../../../../../../../assets/image/control_play.png')"
+	    disabledIcon="@Embed(source='../../../../../../../assets/image/control_play_disabled.png')"
+	    icon="@Embed(source='../../../../../../../assets/image/control_play.png')"
+	    enabled="{!QueryModelLocator.getInstance().running}"
+		/>
+
+	<mx:Button id="cancelButton" 
+		click="onClickCancel(event)" 
+		right="10"
+	    upIcon="@Embed(source='../../../../../../../assets/image/cancel.png')"
+	    overIcon="@Embed(source='../../../../../../../assets/image/cancel.png')"
+	    downIcon="@Embed(source='../../../../../../../assets/image/cancel.png')"
+	    disabledIcon="@Embed(source='../../../../../../../assets/image/cancel_disabled.png')"
+	    icon="@Embed(source='../../../../../../../assets/image/cancel.png')"
+	    enabled="{QueryModelLocator.getInstance().running}"
+		/>
+
+	<!-- Annoyingly this adds height to the controlbar, tried lots of things to make this go away :(-->	
+    <mx:Form paddingTop="0" paddingBottom="0">
+        <mx:FormItem label="LIMIT">
+			<mx:TextInput id="queryLimit" enabled="{limitEnabled}" text="{limit}" width="40"/>
+        </mx:FormItem>
+    </mx:Form>
+
+	<mx:CheckBox id="useQueryLimit" selected="{limitEnabled}" click="onClickCheck(event)"/>
+
+    <mx:Form paddingTop="0" paddingBottom="0">
+        <mx:FormItem label="Endpoint">
+			<mx:ComboBox id="queryEndpoint"
+				editable="true"
+				selectedIndex="0"
+				change="onEndpointChange(event)"
+				dataProvider="{_endpoints}"
+				labelFunction="endpointLabel"
+				width="100%"/>
+        </mx:FormItem>
+    </mx:Form>
+
+    <mx:Form paddingTop="0" paddingBottom="0">
+        <mx:FormItem label="Query">
+			<mx:ComboBox id="queryPredefined"
+				editable="false"
+				change="onQueryChange(event)"
+				selectedIndex="0"
+				labelFunction="queryLabel"
+				dataProvider="{_queries}"
+				width="100%"/>
+        </mx:FormItem>
+    </mx:Form>
+
+	<mx:Spacer width="1%"/>
+	
+	<mx:Button id="aboutButton"
+		click="onAbout(event)" 
+		right="10"
+	    upIcon="@Embed(source='../../../../../../../assets/image/help.png')"
+	    overIcon="@Embed(source='../../../../../../../assets/image/help.png')"
+	    downIcon="@Embed(source='../../../../../../../assets/image/help.png')"
+	    disabledIcon="@Embed(source='../../../../../../../assets/image/help.png')"
+	    icon="@Embed(source='../../../../../../../assets/image/help.png')"/>
+		
+</mx:ApplicationControlBar>

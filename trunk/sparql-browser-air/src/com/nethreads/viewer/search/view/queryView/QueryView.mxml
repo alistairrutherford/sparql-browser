@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+ * Copyright 2008 -  Alistair Rutherford - www.netthreads.co.uk, Jan 2008
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ * 
+-->
+
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" 
+				xmlns:fc="http://www.adobe.com/2006/fc"
+			    xmlns:query="com.nethreads.viewer.search.view.queryView.*" 
+				creationComplete="init()"
+				horizontalScrollPolicy="off"
+				verticalScrollPolicy="off">
+	
+	<mx:Metadata>
+        [Event(name="about", type="flash.events.Event")]
+	</mx:Metadata>
+	
+	<mx:Script>
+		<![CDATA[
+			import com.nethreads.viewer.search.events.QueryEvent;
+			import com.nethreads.viewer.search.model.QueryModelLocator;
+			import com.nethreads.viewer.search.model.ResultModelLocator;
+			import com.nethreads.viewer.search.events.data.GetResultsEvent;
+			import com.nethreads.viewer.search.view.aboutView.AboutView;
+
+			[Bindable] private var queryText:String = "";
+			[Bindable] private var prefixText:String = "";
+			
+		    /**
+		    * Initialise
+		    *
+		    */
+			private function init():void
+			{
+				// Nowt
+			}
+			
+			/**
+			* Triggered when execute query button is pressed.
+			*
+			* @param ev The query event broadcast from control bar.
+			*/
+			private function onExecuteQuery(ev:QueryEvent):void
+			{
+				var a:String = queryInput.text;
+				var b:String = prefixInput.text;
+				
+		        var searchEvent:GetResultsEvent = new GetResultsEvent(queryInput.text, prefixInput.text, ev.limit, ev.endpoint);
+		        searchEvent.dispatch();
+			}
+
+		    /**
+		    * Dispatch search request up to application via event.
+		    *
+		    */
+		    private function onAbout(event:Event):void
+		    {
+		    	var ev:Event = new Event("about");
+		    	this.dispatchEvent(ev);
+		    }			
+		    
+		]]>
+	</mx:Script>
+
+	<query:TopBar id="topBar" width="100%" executeQuery="{onExecuteQuery(event)}" about="{onAbout(event)}"/>
+	
+	<mx:TabNavigator id="queryTabs" width="100%" height="100%" creationPolicy="all">
+
+		<mx:Box label="Query" width="100%" height="100%">
+			<mx:TextArea id="queryInput" text="{QueryModelLocator.getInstance().query}" width="100%" height="100%"/>
+		</mx:Box>	
+
+		<mx:Box label="Prefix" width="100%" height="100%">
+			<mx:TextArea id="prefixInput" text="{QueryModelLocator.getInstance().prefix}" width="100%" height="100%"/>
+		</mx:Box>	
+		
+	</mx:TabNavigator>
+	
+</mx:VBox>
